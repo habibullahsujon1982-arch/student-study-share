@@ -1,0 +1,276 @@
+<pgsql>
+  frontend/
+ ├── index.html
+ ├── style.css
+ └── script.js
+</pgsql>
+
+<!DOCTYPE html>
+<style>
+  body {
+  font-family: Arial, sans-serif;
+  background: #0d0d0d;
+  margin: 0;
+  padding: 0;
+  color: #f1f1f1;
+}
+
+.header {
+  background: linear-gradient(135deg, #1c1c1c, #333);
+  color: white;
+  text-align: center;
+  padding: 1.5rem;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+}
+
+.main {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  padding: 20px;
+}
+
+.form-section {
+  grid-column: 1 / -1;
+  background: #1a1a1a;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.form-control {
+  margin: 5px 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #555;
+  background: #262626;
+  color: #f1f1f1;
+}
+
+.btn {
+  margin-top: 8px;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: #4a90e2;
+  color: white;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.btn:hover { background: #357ab8; }
+.btn-request { background: #6a5acd; }
+.btn-request:hover { background: #4a3cb0; }
+
+.notes-section, .requests-section {
+  background: #1a1a1a;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+h2 { margin-top: 0; border-bottom: 2px solid #333; padding-bottom: 8px; }
+
+.notes-list, .request-list { list-style: none; padding: 0; }
+
+.note-item, .request-item {
+  background: #262626;
+  margin: 8px 0;
+  padding: 10px;
+  border-radius: 8px;
+  position: relative;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  color: #f1f1f1;
+}
+
+.note-item a { text-decoration: none; color: #4a90e2; font-weight: bold; display: block; }
+
+.delete-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #ff4d4d;
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.delete-btn:hover { background: #cc0000; }
+
+</style>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Study Share</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>Student Study Share</h1>
+    <p>A place where students can share and request study materials</p>
+  </header>
+
+  <main class="main">
+    <!-- Add Note Form -->
+    <section class="form-section">
+      <form id="noteForm">
+        <label for="classSelect">Select Class:</label>
+        <select id="classSelect" class="form-control">
+          <option value="class6">Class 6</option>
+          <option value="class7">Class 7</option>
+          <option value="class8">Class 8</option>
+          <option value="class9">Class 9</option>
+        </select>
+
+        <input type="text" id="noteInput" class="form-control" placeholder="Write your note...">
+        <input type="file" id="fileInput" class="form-control">
+
+        <button type="submit" class="btn">Add Note</button>
+      </form>
+    </section>
+
+    <!-- Request Form -->
+    <section class="form-section">
+      <form id="requestForm">
+        <label for="requestInput">Write your request:</label>
+        <input type="text" id="requestInput" class="form-control" placeholder="e.g. Need Math notes for Class 7">
+        <button type="submit" class="btn btn-request">Submit Request</button>
+      </form>
+    </section>
+
+    <!-- Notes Section -->
+    <section class="notes-section">
+      <h2>Notes</h2>
+      <ul id="notesList" class="notes-list"></ul>
+    </section>
+
+    <!-- Requests Section -->
+    <section class="requests-section">
+      <h2>Requests</h2>
+      <ul id="requestList" class="request-list"></ul>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
+<script>
+  const API_URL = "http://localhost:5000/api";
+
+// Elements
+const noteForm = document.getElementById("noteForm");
+const classSelect = document.getElementById("classSelect");
+const noteInput = document.getElementById("noteInput");
+const fileInput = document.getElementById("fileInput");
+const notesList = document.getElementById("notesList");
+
+const requestForm = document.getElementById("requestForm");
+const requestInput = document.getElementById("requestInput");
+const requestList = document.getElementById("requestList");
+
+// Add Note
+noteForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const className = classSelect.value;
+  const text = noteInput.value.trim();
+  let fileName = null, fileData = null;
+
+  if (!text && fileInput.files.length === 0) {
+    alert("Please add text or file");
+    return;
+  }
+
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    fileName = file.name;
+    fileData = await fileToBase64(file);
+  }
+
+  await fetch(`${API_URL}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ className, text, fileName, fileData })
+  });
+
+  noteInput.value = "";
+  fileInput.value = "";
+  fetchNotes();
+});
+
+// Add Request
+requestForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = requestInput.value.trim();
+  if (!text) return alert("Please write a request");
+  await fetch(`${API_URL}/requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  requestInput.value = "";
+  fetchRequests();
+});
+
+// Fetch Notes
+async function fetchNotes() {
+  const className = classSelect.value;
+  const res = await fetch(`${API_URL}/notes/${className}`);
+  const notes = await res.json();
+  notesList.innerHTML = "";
+  notes.forEach(n => {
+    const li = document.createElement("li");
+    li.className = "note-item";
+    if (n.text) li.innerHTML += `<p>${n.text}</p>`;
+    if (n.fileName && n.fileData) li.innerHTML += `<a href="${n.fileData}" download="${n.fileName}">${n.fileName}</a>`;
+    const delBtn = document.createElement("button");
+    delBtn.className = "delete-btn";
+    delBtn.textContent = "X";
+    delBtn.onclick = async () => {
+      await fetch(`${API_URL}/notes/${n._id}`, { method: "DELETE" });
+      fetchNotes();
+    };
+    li.appendChild(delBtn);
+    notesList.appendChild(li);
+  });
+}
+
+// Fetch Requests
+async function fetchRequests() {
+  const res = await fetch(`${API_URL}/requests`);
+  const requests = await res.json();
+  requestList.innerHTML = "";
+  requests.forEach(r => {
+    const li = document.createElement("li");
+    li.className = "request-item";
+    li.textContent = r.text;
+    const delBtn = document.createElement("button");
+    delBtn.className = "delete-btn";
+    delBtn.textContent = "X";
+    delBtn.onclick = async () => {
+      await fetch(`${API_URL}/requests/${r._id}`, { method: "DELETE" });
+      fetchRequests();
+    };
+    li.appendChild(delBtn);
+    requestList.appendChild(li);
+  });
+}
+
+// File to Base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Initial fetch
+fetchNotes();
+fetchRequests();
+classSelect.addEventListener("change", fetchNotes);
+
+</script>
